@@ -7,10 +7,12 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
+let access_token = "";
+
 app.use(cors());
 app.use(express.json());
 
-// 🔄 Refrescar access token usando refresh_token dinámico
+// 🔄 Refrescar access token usando el refresh_token recibido por parámetro
 async function refreshAccessToken(refresh_token) {
   try {
     const params = new URLSearchParams();
@@ -26,23 +28,24 @@ async function refreshAccessToken(refresh_token) {
       }
     });
 
-    return response.data.access_token;
+    access_token = response.data.access_token;
+    console.log('✅ Access token actualizado');
   } catch (err) {
     console.error('❌ Error actualizando token:', err.response?.data || err.message);
-    throw new Error('Token inválido');
+    throw err;
   }
 }
 
-// 🎵 Buscar y reproducir canción con el token del usuario
+// 🎵 Buscar y reproducir canción
 app.get('/play', async (req, res) => {
   const query = req.query.query;
-  const userRefreshToken = req.query.token || req.headers['authorization']?.replace('Bearer ', '');
+  const refresh_token = req.query.token;
 
   if (!query) return res.status(400).json({ ok: false, error: 'Falta query' });
-  if (!userRefreshToken) return res.status(400).json({ ok: false, error: 'Falta refresh_token' });
+  if (!refresh_token) return res.status(400).json({ ok: false, error: 'Falta refresh_token' });
 
   try {
-    const access_token = await refreshAccessToken(userRefreshToken);
+    await refreshAccessToken(refresh_token);
 
     const searchRes = await axios.get('https://api.spotify.com/v1/search', {
       headers: { Authorization: `Bearer ${access_token}` },
@@ -60,8 +63,7 @@ app.get('/play', async (req, res) => {
 
     res.json({ ok: true, title: `${track.name} - ${track.artists[0].name}` });
   } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.status(500).json({ ok: false, error: 'Error al reproducir' });
+    res.status(500).json({ ok: false, error: 'Error al reproducir canción' });
   }
 });
 
@@ -69,4 +71,3 @@ app.get('/play', async (req, res) => {
 app.listen(port, () => {
   console.log(`🎵 Spotify backend activo en puerto ${port}`);
 });
-
