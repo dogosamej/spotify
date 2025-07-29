@@ -7,14 +7,11 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-let access_token = "";
-let refresh_token = process.env.SPOTIFY_REFRESH_TOKEN;
-
 app.use(cors());
 app.use(express.json());
 
-// 🔄 Refrescar access token automáticamente
-async function refreshAccessToken() {
+// 🔄 Refrescar access token usando refresh_token dinámico
+async function refreshAccessToken(refresh_token) {
   try {
     const params = new URLSearchParams();
     params.append('grant_type', 'refresh_token');
@@ -29,20 +26,23 @@ async function refreshAccessToken() {
       }
     });
 
-    access_token = response.data.access_token;
-    console.log('✅ Access token actualizado');
+    return response.data.access_token;
   } catch (err) {
-    console.error('❌ Error actualizando el token:', err.response?.data || err.message);
+    console.error('❌ Error actualizando token:', err.response?.data || err.message);
+    throw new Error('Token inválido');
   }
 }
 
-// 🎵 Buscar y reproducir canción
+// 🎵 Buscar y reproducir canción con el token del usuario
 app.get('/play', async (req, res) => {
   const query = req.query.query;
+  const userRefreshToken = req.query.token || req.headers['authorization']?.replace('Bearer ', '');
+
   if (!query) return res.status(400).json({ ok: false, error: 'Falta query' });
+  if (!userRefreshToken) return res.status(400).json({ ok: false, error: 'Falta refresh_token' });
 
   try {
-    await refreshAccessToken();
+    const access_token = await refreshAccessToken(userRefreshToken);
 
     const searchRes = await axios.get('https://api.spotify.com/v1/search', {
       headers: { Authorization: `Bearer ${access_token}` },
@@ -69,3 +69,4 @@ app.get('/play', async (req, res) => {
 app.listen(port, () => {
   console.log(`🎵 Spotify backend activo en puerto ${port}`);
 });
+
