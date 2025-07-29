@@ -13,6 +13,7 @@ let refresh_token = process.env.SPOTIFY_REFRESH_TOKEN;
 app.use(cors());
 app.use(express.json());
 
+// 🔄 Refrescar access token automáticamente
 async function refreshAccessToken() {
   try {
     const params = new URLSearchParams();
@@ -64,50 +65,7 @@ app.get('/play', async (req, res) => {
   }
 });
 
-// 🔐 Rutas TEMPORALES para obtener refresh_token
-app.get('/login', (req, res) => {
-  const redirect_uri = 'https://spotify-wf26.onrender.com/callback';
-  const scopes = 'user-read-playback-state user-modify-playback-state streaming';
-
-  const authURL = 'https://accounts.spotify.com/authorize?' +
-    new URLSearchParams({
-      response_type: 'code',
-      client_id: process.env.SPOTIFY_CLIENT_ID,
-      scope: scopes,
-      redirect_uri
-    }).toString();
-
-  res.redirect(authURL);
-});
-
-app.get('/callback', async (req, res) => {
-  const code = req.query.code || null;
-  const redirect_uri = 'https://spotify-wf26.onrender.com/callback';
-
-  try {
-    const params = new URLSearchParams();
-    params.append('grant_type', 'authorization_code');
-    params.append('code', code);
-    params.append('redirect_uri', redirect_uri);
-
-    const response = await axios.post('https://accounts.spotify.com/api/token', params, {
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(
-          process.env.SPOTIFY_CLIENT_ID + ':' + process.env.SPOTIFY_CLIENT_SECRET
-        ).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-
-    const refresh_token = response.data.refresh_token;
-    res.send(`✅ Tu REFRESH TOKEN es:<br><br><code>${refresh_token}</code><br><br>¡Guárdalo en Render y elimina /login y /callback luego!`);
-  } catch (err) {
-    console.error('Error obteniendo token:', err.response?.data || err.message);
-    res.send('❌ Error obteniendo token. Mira la consola de Render.');
-  }
-});
-
+// 🚀 Iniciar servidor
 app.listen(port, () => {
   console.log(`🎵 Spotify backend activo en puerto ${port}`);
 });
-
